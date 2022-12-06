@@ -1,0 +1,26 @@
+{
+  "name": "multi-car-server",
+  "version": "1.0.0",
+  "description": "ws server for transfer car data",
+  "main": "src/index.ts",
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ws": "^7.4.3",
+    "uuid": "^9.0.0",
+    "dotenv": "^16.0.3"
+  },
+  "scripts": {
+    "build": "npx tsc",
+    "start": "node dist/index.js",
+    "dev": "concurrently \"npx tsc --watch\" \"nodemon -q dist/index.js\""
+  },
+  "devDependencies": {
+    "@types/uuid": "^9.0.0",
+    "@types/ws": "^8.5.3",
+    "nodemon": "^2.0.20",
+    "@types/node": "^18.11.11",
+    "typescript": "^4.9.3",
+    "concurrently": "^7.6.0"
+  }
+}
