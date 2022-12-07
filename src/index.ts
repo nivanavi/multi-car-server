@@ -1,45 +1,54 @@
 import WebSocket from 'ws';
-import { v4 } from 'uuid';
 import dotenv from 'dotenv';
+import {WebsocketMessages} from "./types";
 
 dotenv.config();
 
 const port = Number(process.env.PORT);
 
-const wsServer = new WebSocket.Server({ port });
-const clients = new Map();
+const wsServer = new WebSocket.Server({port});
+const clients = new Map<WebSocket, { id: string }>();
+
 const connectHandler = (ws: WebSocket) => {
-	const id = v4();
-	const color = Math.floor(Math.random() * 360);
-	const initialMetadata = { id, color };
+    ws.on('message', rawMessage => {
+        const message: WebsocketMessages = JSON.parse(String(rawMessage));
 
-	clients.set(ws, initialMetadata);
+        switch (message.action) {
+            case "CAR_CONNECTED":
+                clients.set(ws, {id: message?.payload?.id});
+                [...clients.keys()].forEach(client => {
+                    const currentClient = clients.get(client);
+                    if (!currentClient?.id || currentClient.id === message?.payload?.id) return;
+                    client.send(JSON.stringify(message));
+                })
+                break;
+            case "CAR_MOVE":
+                [...clients.keys()].forEach(client => {
+                    const currentClient = clients.get(client);
+                    if (!currentClient?.id || currentClient.id === message?.payload?.id) return;
+                    client.send(JSON.stringify(message));
+                })
+                break;
+        }
+    });
 
-	ws.on('message', rawMessage => {
-		const message = JSON.parse(String(rawMessage));
-		const metadata = clients.get(ws);
-		message.sender = metadata.id;
+    ws.on('close', () => {
+        const currentWs = clients.get(ws);
+        if (!currentWs?.id) return;
 
-		const outbound = JSON.stringify(message);
+        [...clients.keys()].forEach(client => {
+            const currentClient = clients.get(client);
+            if (!currentClient?.id || currentClient.id === currentWs.id) return;
+            client.send(JSON.stringify({
+                action: 'CAR_DELETE',
+                payload: {
+                    id: currentWs.id
+                }
+            }));
+        })
 
-		[...clients.keys()].forEach(client => {
-			client.send(outbound);
-		});
-	});
-
-	ws.on('close', () => {
-		const metadata = clients.get(ws);
-		const message = JSON.stringify({
-			action: 'CAR_DELETE',
-			data: JSON.stringify({
-				id: metadata.id,
-			}),
-		});
-		[...clients.keys()].forEach(client => {
-			client.send(message);
-		});
-		clients.delete(ws);
-	});
+        clients.delete(ws);
+    });
 };
 
 wsServer.on('connection', connectHandler);
