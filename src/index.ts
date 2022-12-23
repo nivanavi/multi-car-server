@@ -34,6 +34,15 @@ const connectHandler = (ws: WebSocket) => {
                     client.send(JSON.stringify(message));
                 })
                 break;
+            case "BALL_MOVE":
+                [...clients.keys()].forEach(client => {
+                    const currentClient = clients.get(client);
+                    const {carId, roomId} = currentClient || {};
+                    if (!carId || !roomId) return;
+                    if (carId === messageCarId || roomId !== messageRoomId) return;
+                    client.send(JSON.stringify(message));
+                })
+                break;
         }
     });
 
