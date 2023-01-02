@@ -7,16 +7,16 @@ dotenv.config();
 const port = Number(process.env.PORT);
 
 const wsServer = new WebSocket.Server({port});
-const clients = new Map<WebSocket, { carId: string, roomId: string }>();
+const clients = new Map<WebSocket, { carId: string, roomId: string, nickname: string }>();
 
 const connectHandler = (ws: WebSocket) => {
     ws.on('message', rawMessage => {
         const message: WebsocketMessages = JSON.parse(String(rawMessage));
-        const {action, payload: {carId: messageCarId, roomId: messageRoomId}} = message || {};
+        const {action, payload: {carId: messageCarId, roomId: messageRoomId, nickname: messageNickname}} = message || {};
 
         switch (action) {
             case "CAR_CONNECTED":
-                clients.set(ws, {carId: messageCarId, roomId: messageRoomId});
+                clients.set(ws, {carId: messageCarId, roomId: messageRoomId, nickname: messageNickname || messageCarId});
                 [...clients.keys()].forEach(client => {
                     const currentClient = clients.get(client);
                     const {carId, roomId} = currentClient || {};
@@ -48,7 +48,7 @@ const connectHandler = (ws: WebSocket) => {
 
     ws.on('close', () => {
         const currentWs = clients.get(ws);
-        const {carId: wsCarId, roomId: wsRoomId} = currentWs || {};
+        const {carId: wsCarId, roomId: wsRoomId, nickname: wsNickname} = currentWs || {};
         if (!wsCarId || !wsRoomId) return;
 
         [...clients.keys()].forEach(client => {
@@ -59,7 +59,9 @@ const connectHandler = (ws: WebSocket) => {
             client.send(JSON.stringify({
                 action: 'CAR_DELETE',
                 payload: {
-                    carId: wsCarId
+                    carId: wsCarId,
+                    roomId: wsRoomId,
+                    nickname: wsNickname
                 }
             }));
         })
