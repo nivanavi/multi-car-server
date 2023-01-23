@@ -1,22 +1,30 @@
 import WebSocket from 'ws';
 import dotenv from 'dotenv';
-import {WebsocketMessages} from "./types";
+import {Player, WebsocketMessages} from "./types";
 
 dotenv.config();
 
 const port = Number(process.env.PORT);
 
 const wsServer = new WebSocket.Server({port});
-const clients = new Map<WebSocket, { carId: string, roomId: string, nickname: string }>();
+const clients = new Map<WebSocket, Player>();
 
 const connectHandler = (ws: WebSocket) => {
     ws.on('message', rawMessage => {
         const message: WebsocketMessages = JSON.parse(String(rawMessage));
         const {action, payload: {carId: messageCarId, roomId: messageRoomId, nickname: messageNickname}} = message || {};
 
+        const currentPlayer = clients.get(ws);
+
         switch (action) {
             case "CAR_CONNECTED":
-                clients.set(ws, {carId: messageCarId, roomId: messageRoomId, nickname: messageNickname || messageCarId});
+                const isBallRoot = clients.size === 0;
+                clients.set(ws, {
+                    carId: messageCarId,
+                    roomId: messageRoomId,
+                    nickname: messageNickname || messageCarId,
+                    isBallRoot
+                });
                 [...clients.keys()].forEach(client => {
                     const currentClient = clients.get(client);
                     const {carId, roomId} = currentClient || {};
@@ -35,6 +43,7 @@ const connectHandler = (ws: WebSocket) => {
                 })
                 break;
             case "BALL_MOVE":
+                if (!currentPlayer || !currentPlayer.isBallRoot) return;
                 [...clients.keys()].forEach(client => {
                     const currentClient = clients.get(client);
                     const {carId, roomId} = currentClient || {};
@@ -47,8 +56,9 @@ const connectHandler = (ws: WebSocket) => {
     });
 
     ws.on('close', () => {
-        const currentWs = clients.get(ws);
-        const {carId: wsCarId, roomId: wsRoomId, nickname: wsNickname} = currentWs || {};
+        const currentPlayer = clients.get(ws);
+        const {carId: wsCarId, roomId: wsRoomId, nickname: wsNickname, isBallRoot} = currentPlayer || {};
+
         if (!wsCarId || !wsRoomId) return;
 
         [...clients.keys()].forEach(client => {
@@ -67,6 +77,13 @@ const connectHandler = (ws: WebSocket) => {
         })
 
         clients.delete(ws);
+
+        if (isBallRoot && clients.size !== 0) {
+            const [firstPlayerWs] = clients.entries().next().value as [ws: WebSocket | undefined];
+
+            const firstPlayer = firstPlayerWs ? clients.get(firstPlayerWs) : undefined;
+            if (firstPlayer) firstPlayer.isBallRoot = true;
+        }
     });
 };
 
