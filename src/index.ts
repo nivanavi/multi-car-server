@@ -9,6 +9,21 @@ const port = Number(process.env.PORT);
 const wsServer = new WebSocket.Server({port});
 const clients = new Map<WebSocket, Player>();
 
+const setBallRoot = (roomId: string) => {
+    let isAlreadyHaveBallRoot: boolean = false;
+    const clientsInThisRoom: WebSocket[] = [...clients.keys()].reduce<WebSocket[]>((clientsInRoom, clientWs) => {
+        const currentClient = clients.get(clientWs);
+        const {roomId: clientRoomId, isBallRoot} = currentClient || {};
+        if (!currentClient || !roomId || clientRoomId !== roomId) return clientsInRoom;
+        if (isBallRoot) isAlreadyHaveBallRoot = true;
+        clientsInRoom.push(clientWs);
+        return clientsInRoom;
+    }, []);
+    if (isAlreadyHaveBallRoot || clientsInThisRoom.length === 0) return;
+    const nextBallRootInThisRoom = clients.get(clientsInThisRoom[0]);
+    if (!nextBallRootInThisRoom) return;
+    nextBallRootInThisRoom.isBallRoot = true;
+}
 const connectHandler = (ws: WebSocket) => {
     ws.on('message', rawMessage => {
         const message: WebsocketMessages = JSON.parse(String(rawMessage));
@@ -18,13 +33,13 @@ const connectHandler = (ws: WebSocket) => {
 
         switch (action) {
             case "CAR_CONNECTED":
-                const isBallRoot = clients.size === 0;
                 clients.set(ws, {
                     carId: messageCarId,
                     roomId: messageRoomId,
                     nickname: messageNickname || messageCarId,
-                    isBallRoot
+                    isBallRoot: false
                 });
+                setBallRoot(messageRoomId);
                 [...clients.keys()].forEach(client => {
                     const currentClient = clients.get(client);
                     const {carId, roomId} = currentClient || {};
@@ -78,12 +93,7 @@ const connectHandler = (ws: WebSocket) => {
 
         clients.delete(ws);
 
-        if (isBallRoot && clients.size !== 0) {
-            const [firstPlayerWs] = clients.entries().next().value as [ws: WebSocket | undefined];
-
-            const firstPlayer = firstPlayerWs ? clients.get(firstPlayerWs) : undefined;
-            if (firstPlayer) firstPlayer.isBallRoot = true;
-        }
+        if (isBallRoot && clients.size !== 0) setBallRoot(wsRoomId);
     });
 };
 
