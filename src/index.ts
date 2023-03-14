@@ -49,6 +49,14 @@ const connectHandler = (ws: WebSocket) => {
                 })
                 break;
             case "CHARACTER_DELETE":
+                [...clients.keys()].forEach(client => {
+                    const currentClient = clients.get(client);
+                    const {id, roomId} = currentClient || {};
+                    if (!id || !roomId) return;
+                    if (roomId !== messageRoomId) return;
+                    client.send(JSON.stringify(message));
+                })
+                break;
             case "CHARACTER_SHOT":
             case "CHARACTER_DAMAGED":
                 [...clients.keys()].forEach(client => {
